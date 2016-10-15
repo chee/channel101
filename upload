@@ -1,20 +1,18 @@
 #!/usr/bin/env node
+
 require('dotenv').config()
 
 const util = require('util')
 const fs = require('fs')
 const glob = require('glob')
 const scraper = new require('page-scraper')({
-  baseUrl: 'http://www.channel101.com/episode',
-  uri: {}
+	baseUrl: 'http://www.channel101.com/episode',
+	uri: {}
 })
 const google = require('google-cli-auth')
 
-const { log, print_error } = console
-console.log = Function.prototype
-
 const FIRST_EPISODE = Number(process.env.FIRST_EPISODE)
-const LAST_EPISODE = 128 || Number(process.env.LAST_EPISODE)
+const LAST_EPISODE = Number(process.env.LAST_EPISODE)
 
 const CLIENT_ID = process.env.CLIENT_ID
 const SECRET = process.env.SECRET
@@ -22,57 +20,125 @@ const SECRET = process.env.SECRET
 const TITLE_PREFIX = 'Channel 101 - '
 
 function range(start, end) {
-  end == null && ([start, end] = [0, start])
-  return [...Array(end + 1).keys()].map((n, index) => n + start).filter(n => n <= end)
+	end == null && ([start, end] = [0, start])
+	return [...Array(end + 1).keys()].map((n, index) => n + start).filter(n => n <= end)
 }
 
-const data = { episodes: [] }
-
 const scrape = index => (
-  new Promise((resolve, reject) => {
-    scraper.scrape(`/${index}`, (error, scrape) => {
-      if (error) reject(error)
-      const title = scrape('.title').first().text().trim().replace(/\s+/g, ' ')
-      const description = scrape('#creditsContainer').text().replace(/\t+/g, ' ').trim()
-      const fullTitle = TITLE_PREFIX + title
-      resolve({
-        title,
-        fullTitle,
-        description
+	new Promise((resolve, reject) => {
+		scraper.scrape(`/${index}`, (error, scrape) => {
+			if (error) reject(error)
+			const title = scrape('.title').first().text().trim().replace(/\s+/g, ' ')
+			const description = scrape('#creditsContainer').text().replace(/\t+/g, ' ').trim()
+			const fullTitle = TITLE_PREFIX + title
+			resolve({
+				title,
+				fullTitle,
+				description
+			})
+		})
+	})
+)
+
+const episodes = []
+let promise = Promise.resolve()
+range(FIRST_EPISODE, LAST_EPISODE).forEach(episode => {
+	promise = promise.then(() => (
+		scrape(`${episode}`).then(({
+			title,
+			fullTitle,
+			description
+		}) => (
+			new Promise((resolve, reject) => {
+				glob(`${__dirname}/${fullTitle}*.m4v`,
+					(error, files) => error ? reject(error) : resolve({
+						title,
+						description,
+						path: files[0]
+					})
+				)
+			})
+		)).then((video) => {
+		  episodes.push(video)
+			return episodes
+		})
+	)).catch(console.error)
+})
+
+promise.then(episodes => {
+  episodes.forEach(episode => {
+    const Youtube = require('youtube-api')
+    const readJson = require('r-json')
+    const	Lien = require('lien')
+    const Logger = require('bug-killer')
+    const	opn = require('opn')
+    const	prettyBytes = require('pretty-bytes')
+
+    const CREDENTIALS = readJson(`${__dirname}/credentials.json`)
+
+    const server = new Lien({
+      host: 'localhost',
+      port: 5000
+    })
+
+    const oauth = Youtube.authenticate({
+      type: 'oauth',
+      client_id: CREDENTIALS.web.client_id,
+      client_secret: CREDENTIALS.web.client_secret,
+      redirect_url: CREDENTIALS.web.redirect_uris[0]
+    })
+
+    opn(oauth.generateAuthUrl({
+      access_type: 'offline',
+      scope: ['https://www.googleapis.com/auth/youtube.upload']
+    }))
+
+    server.addPage('/oauth2callback', lien => {
+      Logger.log('Trying to get the token using the following code: ' + lien.query.code)
+      oauth.getToken(lien.query.code, (err, tokens) => {
+
+        if (err) {
+          lien.lien(err, 400)
+          return Logger.log(err)
+        }
+
+        Logger.log('Got the tokens.')
+
+        oauth.setCredentials(tokens)
+
+        lien.end('The video is being uploaded. Check out the logs in the terminal.')
+
+        var req = Youtube.videos.insert({
+          resource: {
+            // Video title and description
+            snippet: {
+              title: episode.title,
+              description: episode.description
+            }
+            // I don't want to spam my subscribers
+            ,
+            status: {
+              privacyStatus: 'public'
+            }
+          }
+          // This is for the callback function
+          ,
+          part: 'snippet,status'
+
+          // Create the readable stream to upload the video
+          ,
+          media: {
+            body: fs.createReadStream(episode.path)
+          }
+        }, (err, data) => {
+          console.log('Done.')
+          process.exit()
+        })
+
+        setInterval(function() {
+          Logger.log(`${prettyBytes(req.req.connection._bytesDispatched)} bytes uploaded.`)
+        }, 250)
       })
     })
   })
-)
-
-const login = new Promise((resolve, reject) => {
-  google({
-    name: 'channel101',
-    client_id: CLIENT_ID,
-    client_secret: SECRET,
-    scope: ['https://www.googleapis.com/auth/youtube.upload']
-  }, (error, token) => error ? reject(error) : resolve(token))
-}).then(token => {
-  data.token = token
-})
-
-let promise = Promise.resolve()
-range(FIRST_EPISODE, LAST_EPISODE).forEach(episode => {
-  promise = promise.then(() => (
-    scrape(`${episode}`).then(({title, fullTitle, description}) => (
-      new Promise((resolve, reject) => {
-        glob(`${__dirname}/${fullTitle}*.m4v`,
-          (error, files) => error ? reject(error) : resolve({
-            title,
-            description,
-            path: files[0]
-          })
-        )
-      })
-    )).then((video) => {
-      data.episodes.push(video)
-      return data
-    })
-  ))
-})
-
-Promise.all([login, promise]).then(() => log(JSON.stringify(data))).catch(error => print_error(error) || process.exit(2))
+}).catch(error => console.error(error) || process.exit(2))
