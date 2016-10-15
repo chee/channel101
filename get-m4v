@@ -1,0 +1,7 @@
+#!/bin/zsh
+# requiring zsh for range with variables
+
+source .env
+for episode in {$FIRST_EPISODE..$LAST_EPISODE}; do
+  youtube-dl http://www.channel101.com/episode/$episode
+done
