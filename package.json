@@ -1,0 +1,14 @@
+{
+  "name": "channel101",
+  "version": "1.0.0",
+  "description": "scrape channel 101 (and upload videos to youtube)",
+  "main": "channel101.js",
+  "author": "chee <chee@snaek.org>",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^2.0.0",
+    "glob": "^7.1.1",
+    "google-cli-auth": "^0.0.1",
+    "page-scraper": "^1.0.1"
+  }
+}
