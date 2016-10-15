@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'dotenv'
+require 'youtube_it'
+
+Dotenv.load
+
+data = JSON.parse(`./get-data`)
+
+client = YouTubeIt::OAuth2Client.new(
+  client_access_token: data['token']['access_token'],
+  client_refresh_token: data['token']['refresh_token'],
+  client_id: ENV['CLIENT_ID'],
+  client_secret: ENV['CLIENT_SECRET'],
+  dev_key: ENV['KEY'],
+  expires_at: data['token']['expires_at']
+)
+
+episodes = data['episodes']
+
+episodes.each { |episode|
+  client.video_upload(episode['path'],
+    title: episode['title'],
+    description: episode['description']
+  )
+}

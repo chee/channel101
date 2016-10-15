@@ -10,6 +10,9 @@ const scraper = new require('page-scraper')({
 })
 const google = require('google-cli-auth')
 
+const { log, print_error } = console
+console.log = Function.prototype
+
 const FIRST_EPISODE = Number(process.env.FIRST_EPISODE)
 const LAST_EPISODE = 128 || Number(process.env.LAST_EPISODE)
 
@@ -23,7 +26,7 @@ function range(start, end) {
   return [...Array(end + 1).keys()].map((n, index) => n + start).filter(n => n <= end)
 }
 
-const json = { episodes: [] }
+const data = { episodes: [] }
 
 const scrape = index => (
   new Promise((resolve, reject) => {
@@ -49,7 +52,7 @@ const login = new Promise((resolve, reject) => {
     scope: ['https://www.googleapis.com/auth/youtube.upload']
   }, (error, token) => error ? reject(error) : resolve(token))
 }).then(token => {
-  json.token = token
+  data.token = token
 })
 
 let promise = Promise.resolve()
@@ -66,10 +69,10 @@ range(FIRST_EPISODE, LAST_EPISODE).forEach(episode => {
         )
       })
     )).then((video) => {
-      json.episodes.push(video)
-      return json
+      data.episodes.push(video)
+      return data
     })
   ))
 })
 
-promise.then(console.log).catch(error => console.error(error) || process.exit(2))
+Promise.all([login, promise]).then(() => log(JSON.stringify(data))).catch(error => print_error(error) || process.exit(2))
