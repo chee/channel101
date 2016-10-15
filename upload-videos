@@ -1,0 +1,6 @@
+#!/bin/zsh
+source .env
+
+for episode in {$FIRST_EPISODE..$LAST_EPISODE}; do
+  ./upload episode
+done
