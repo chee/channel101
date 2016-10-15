@@ -6,9 +6,15 @@
   "author": "chee <chee@snaek.org>",
   "license": "MIT",
   "dependencies": {
+    "bug-killer": "^4.2.5",
     "dotenv": "^2.0.0",
     "glob": "^7.1.1",
     "google-cli-auth": "0.0.1",
-    "page-scraper": "^1.0.1"
+    "lien": "^1.5.0",
+    "opn": "^4.0.2",
+    "page-scraper": "^1.0.1",
+    "pretty-bytes": "^4.0.2",
+    "r-json": "^1.2.5",
+    "youtube-api": "^2.0.4"
   }
 }
