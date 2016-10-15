@@ -1,0 +1,116 @@
+#!/usr/bin/env node
+require('dotenv').config()
+
+const util = require('util')
+const fs = require('fs')
+const glob = require('glob')
+const scraper = new require('page-scraper')({
+	baseUrl: 'http://www.channel101.com/episode',
+	uri: {}
+})
+const google = require('google-cli-auth')
+
+const CLIENT_ID = process.env.CLIENT_ID
+const SECRET = process.env.SECRET
+
+const TITLE_PREFIX = 'Channel 101 - '
+
+function range(start, end) {
+	end == null && ([start, end] = [0, start])
+	return [...Array(end + 1).keys()].map((n, index) => n + start).filter(n => n <= end)
+}
+
+const scrape = index => (
+	new Promise((resolve, reject) => {
+		scraper.scrape(`/${index}`, (error, scrape) => {
+			if (error) reject(error)
+			const title = scrape('.title').first().text().trim().replace(/\s+/g, ' ')
+			const description = scrape('#creditsContainer').text().replace(/\t+/g, ' ').trim()
+			const fullTitle = TITLE_PREFIX + title
+			resolve({
+				title,
+				fullTitle,
+				description
+			})
+		})
+	})
+)
+
+let findFile = scrape(process.argv[2]).then(({
+	title,
+	fullTitle,
+	description
+}) => (
+	new Promise((resolve, reject) => {
+		glob(`${__dirname}/${fullTitle}*.m4v`,
+			(error, files) => error ? reject(error) : resolve({
+				title,
+				description,
+				path: files[0]
+			})
+		)
+	})
+)).catch(console.error)
+
+findFile.then(({title, description, path}) => {
+  if (!path) return
+  const Youtube = require('youtube-api')
+  const readJson = require('r-json')
+  const	Lien = require('lien')
+  const Logger = require('bug-killer')
+  const	opn = require('opn')
+  const	prettyBytes = require('pretty-bytes')
+
+  const CREDENTIALS = readJson(`${__dirname}/credentials.json`)
+
+  const server = new Lien({
+    host: 'localhost',
+    port: 5000
+  })
+
+  const oauth = Youtube.authenticate({
+    type: 'oauth',
+    client_id: CREDENTIALS.web.client_id,
+    client_secret: CREDENTIALS.web.client_secret,
+    redirect_url: CREDENTIALS.web.redirect_uris[0]
+  })
+
+  opn(oauth.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['https://www.googleapis.com/auth/youtube.upload']
+  }))
+
+  server.addPage('/oauth2callback', lien => {
+    oauth.getToken(lien.query.code, (err, tokens) => {
+      if (err) {
+        lien.lien(err, 400)
+        return Logger.log(err)
+      }
+      oauth.setCredentials(tokens)
+      var req = Youtube.videos.insert({
+        resource: {
+          snippet: {
+            title: title,
+            description: description
+          }
+          ,
+          status: {
+            privacyStatus: 'public'
+          }
+        }
+        ,
+        part: 'snippet,status'
+        ,
+        media: {
+          body: fs.createReadStream(path)
+        }
+      }, (err, data) => {
+        console.log('Done.')
+        process.exit()
+      })
+      setInterval(function() {
+        Logger.log(`${prettyBytes(req.req.connection._bytesDispatched)} bytes uploaded.`)
+      }, 250)
+    })
+  })
+}).catch(console.error)
