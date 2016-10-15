@@ -11,7 +11,7 @@ const scraper = new require('page-scraper')({
 const google = require('google-cli-auth')
 
 const FIRST_EPISODE = Number(process.env.FIRST_EPISODE)
-const LAST_EPISODE = Number(process.env.LAST_EPISODE)
+const LAST_EPISODE = 128 || Number(process.env.LAST_EPISODE)
 
 const CLIENT_ID = process.env.CLIENT_ID
 const SECRET = process.env.SECRET
