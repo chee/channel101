@@ -72,7 +72,7 @@ const authenticate = new Promise(resolve => {
 
 //const episodes = range(process.env.FIRST_EPISODE, process.env.LAST_EPISODE)
 const episodes = [550, 559, 129, 130, 131, 132, 134, 137, 140]
-
+let interval
 authenticate.then(() => {
   let promise = Promise.resolve()
   episodes.forEach(episode => {
@@ -92,6 +92,7 @@ authenticate.then(() => {
       })
     )).then(({title, description, path}) => {
       if (!path) return
+      window.clearInterval(interval)
       const request = Youtube.videos.insert({
         resource: {
           snippet: {
@@ -109,7 +110,7 @@ authenticate.then(() => {
       }, (error, data) => {
         error ? reject(error) : resolve(data)
       })
-      setInterval(function() {
+      interval = setInterval(function() {
         Logger.log(`${prettyBytes(request.req.connection._bytesDispatched)} bytes uploaded.`)
       }, 250)
     }).catch(console.error)
