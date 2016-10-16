@@ -52,55 +52,52 @@ let findFile = scrape(process.argv[2]).then(({
 	})
 )).catch(console.error)
 
-findFile.then(({title, description, path}) => {
-  if (!path) return
-  const Youtube = require('youtube-api')
-  const readJson = require('r-json')
-  const	Lien = require('lien')
-  const Logger = require('bug-killer')
-  const	opn = require('opn')
-  const	prettyBytes = require('pretty-bytes')
+const Youtube = require('youtube-api')
+const readJson = require('r-json')
+const	Lien = require('lien')
+const Logger = require('bug-killer')
+const	opn = require('opn')
+const	prettyBytes = require('pretty-bytes')
 
-  const CREDENTIALS = readJson(`${__dirname}/credentials.json`)
+const CREDENTIALS = readJson(`${__dirname}/credentials.json`)
 
-  const server = new Lien({
-    host: 'localhost',
-    port: 5000
-  })
+const server = new Lien({
+  host: 'localhost',
+  port: 5000
+})
 
-  const oauth = Youtube.authenticate({
-    type: 'oauth',
-    client_id: CREDENTIALS.web.client_id,
-    client_secret: CREDENTIALS.web.client_secret,
-    redirect_url: CREDENTIALS.web.redirect_uris[0]
-  })
+const oauth = Youtube.authenticate({
+  type: 'oauth',
+  client_id: CREDENTIALS.web.client_id,
+  client_secret: CREDENTIALS.web.client_secret,
+  redirect_url: CREDENTIALS.web.redirect_uris[0]
+})
 
-  opn(oauth.generateAuthUrl({
-    access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/youtube.upload']
-  }))
+opn(oauth.generateAuthUrl({
+  access_type: 'offline',
+  scope: ['https://www.googleapis.com/auth/youtube.upload']
+}))
 
-  server.addPage('/oauth2callback', lien => {
-    oauth.getToken(lien.query.code, (err, tokens) => {
-      if (err) {
-        lien.lien(err, 400)
-        return Logger.log(err)
-      }
-      oauth.setCredentials(tokens)
+server.addPage('/oauth2callback', lien => {
+  oauth.getToken(lien.query.code, (err, tokens) => {
+    if (err) {
+      return Logger.log(err)
+    }
+    oauth.setCredentials(tokens)
+    findFile.then(({title, description, path}) => {
+      if (!path) return
+
       var req = Youtube.videos.insert({
         resource: {
           snippet: {
             title: title,
             description: description
-          }
-          ,
+          },
           status: {
             privacyStatus: 'public'
           }
-        }
-        ,
-        part: 'snippet,status'
-        ,
+        },
+        part: 'snippet,status',
         media: {
           body: fs.createReadStream(path)
         }
@@ -111,6 +108,6 @@ findFile.then(({title, description, path}) => {
       setInterval(function() {
         Logger.log(`${prettyBytes(req.req.connection._bytesDispatched)} bytes uploaded.`)
       }, 250)
-    })
+    }).catch(console.error)
   })
-}).catch(console.error)
+})
