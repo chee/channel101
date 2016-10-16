@@ -112,7 +112,7 @@ authenticate.then(() => {
       })
       interval = setInterval(function() {
         Logger.log(`${prettyBytes(request.req.connection._bytesDispatched)} bytes uploaded.`)
-      }, 250)
+      }, 1000)
     }).catch(console.error)
   )).catch(console.error)})
 })
