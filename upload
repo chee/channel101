@@ -63,7 +63,6 @@ const authenticate = new Promise(resolve => {
       if (error) {
         return Logger.log(error)
       }
-      console.log('tokens:', tokens)
       oauth.setCredentials(tokens)
       resolve()
     })
@@ -71,10 +70,11 @@ const authenticate = new Promise(resolve => {
 });
 
 //const episodes = range(process.env.FIRST_EPISODE, process.env.LAST_EPISODE)
-const episodes = [550, 559, 129, 130, 131, 132, 134, 137, 140]
+const episodes = range(196, 199)
 let interval
 authenticate.then(() => {
   let promise = Promise.resolve()
+  let interval
   episodes.forEach(episode => {
     promise = promise.then(() => new Promise((resolve, reject) => scrape(episode).then(({
       title,
@@ -91,8 +91,9 @@ authenticate.then(() => {
         )
       })
     )).then(({title, description, path}) => {
-      if (!path) return
-      window.clearInterval(interval)
+      if (!(path && title)) reject()
+      clearInterval(interval)
+      console.log('uploading', episode, title)
       const request = Youtube.videos.insert({
         resource: {
           snippet: {
