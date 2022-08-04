@@ -1,6 +1,6 @@
 {
   "name": "channel101",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "scrape channel 101 (and upload videos to youtube)",
   "main": "channel101.js",
   "author": "chee <yay@chee.party>",
